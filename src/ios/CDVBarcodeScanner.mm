@@ -66,6 +66,9 @@
 @property (nonatomic)         BOOL                        isFlipped;
 @property (nonatomic)         BOOL                        isTransitionAnimated;
 @property (nonatomic)         BOOL                        isSuccessBeepEnabled;
+@property (nonatomic)         BOOL                        isSuccess;
+@property (nonatomic)         BOOL                        isCancelled;
+
 
 
 - (id)initWithPlugin:(CDVBarcodeScanner*)plugin callback:(NSString*)callback parentViewController:(UIViewController*)parentViewController alterateOverlayXib:(NSString *)alternateXib;
@@ -417,6 +420,8 @@ parentViewController:(UIViewController*)parentViewController
 //--------------------------------------------------------------------------
 - (void)barcodeScanSucceeded:(NSString*)text format:(NSString*)format {
     dispatch_sync(dispatch_get_main_queue(), ^{
+        self.isSuccess = true;
+        
         if (self.isSuccessBeepEnabled) {
             AudioServicesPlaySystemSound(_soundFileObject);
         }
@@ -738,7 +743,7 @@ parentViewController:(UIViewController*)parentViewController
 - (id)initWithProcessor:(CDVbcsProcessor*)processor alternateOverlay:(NSString *)alternateXib {
     self = [super init];
     if (!self) return self;
-
+    
     self.processor = processor;
     self.shutterPressed = NO;
     self.alternateXib = alternateXib;
@@ -762,13 +767,20 @@ parentViewController:(UIViewController*)parentViewController
 
 //--------------------------------------------------------------------------
 - (void)viewWillAppear:(BOOL)animated {
-
+    
     // set video orientation to what the camera sees
     self.processor.previewLayer.connection.videoOrientation = [self interfaceOrientationToVideoOrientation:[UIApplication sharedApplication].statusBarOrientation];
-
+    
     // this fixes the bug when the statusbar is landscape, and the preview layer
     // starts up in portrait (not filling the whole view)
     self.processor.previewLayer.frame = self.view.bounds;
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    if(!(self.processor.isCancelled) && !(self.processor.isSuccess))
+    {
+        [self.processor performSelector:@selector(barcodeScanCancelled) withObject:nil afterDelay:0];
+    }
 }
 
 //--------------------------------------------------------------------------
@@ -817,6 +829,7 @@ parentViewController:(UIViewController*)parentViewController
 
 //--------------------------------------------------------------------------
 - (IBAction)cancelButtonPressed:(id)sender {
+    self.processor.isCancelled = true;
     [self.processor performSelector:@selector(barcodeScanCancelled) withObject:nil afterDelay:0];
 }
 
